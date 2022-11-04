@@ -5,6 +5,7 @@ import (
 	"gopkg.in/yaml.v3"
 	"net/http"
 	"strings"
+	"urlshort/pkg/urlstore"
 )
 
 // MapHandler will return an http.HandlerFunc (which also
@@ -46,7 +47,7 @@ func MapHandler(pathsToUrls map[string]string, fallback http.Handler) http.Handl
 // a mapping of paths to urls.
 func YAMLHandler(yml []byte, fallback http.Handler) (http.HandlerFunc, error) {
 
-	links := make([]redirect, 0)
+	links := make([]urlstore.Redirect, 0)
 	err := yaml.Unmarshal(yml, &links)
 
 	if err != nil {
@@ -84,7 +85,7 @@ func YAMLHandler(yml []byte, fallback http.Handler) (http.HandlerFunc, error) {
 // See MapHandler to create a similar http.HandlerFunc via
 // a mapping of paths to urls.
 func JsonHandler(rawJson []byte, fallback http.Handler) (http.HandlerFunc, error) {
-	links := make([]redirect, 0)
+	links := make([]urlstore.Redirect, 0)
 
 	err := json.Unmarshal(rawJson, &links)
 	if err != nil {
@@ -97,7 +98,23 @@ func JsonHandler(rawJson []byte, fallback http.Handler) (http.HandlerFunc, error
 	}, nil
 }
 
-func doRedirectOrFallback(path string, links []redirect, w http.ResponseWriter, r *http.Request, fallback http.Handler) {
+func DbHandler(store urlstore.Store, fallback http.Handler) (http.HandlerFunc, error) {
+	return func(writer http.ResponseWriter, request *http.Request) {
+		path := normalisePath(request.URL.Path)
+
+		link, err := store.Get(path)
+
+		if err != nil || link == nil {
+			fallback.ServeHTTP(writer, request)
+			return
+		}
+
+		http.RedirectHandler(link.Url, http.StatusPermanentRedirect).ServeHTTP(writer, request)
+
+	}, nil
+}
+
+func doRedirectOrFallback(path string, links []urlstore.Redirect, w http.ResponseWriter, r *http.Request, fallback http.Handler) {
 
 	link := findRedirect(links, path)
 
@@ -109,18 +126,13 @@ func doRedirectOrFallback(path string, links []redirect, w http.ResponseWriter, 
 	fallback.ServeHTTP(w, r)
 }
 
-func findRedirect(links []redirect, path string) *redirect {
+func findRedirect(links []urlstore.Redirect, path string) *urlstore.Redirect {
 	for _, link := range links {
 		if link.Path == path {
 			return &link
 		}
 	}
 	return nil
-}
-
-type redirect struct {
-	Path string `yaml:"path" json:"path"`
-	Url  string `yaml:"url" json:"url"`
 }
 
 func normalisePath(path string) string {

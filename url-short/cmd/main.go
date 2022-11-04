@@ -3,7 +3,9 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"os"
 	"urlshort"
+	"urlshort/pkg/urlstore"
 )
 
 func main() {
@@ -42,9 +44,28 @@ func main() {
 ]
 `
 	jsonHandler, err := urlshort.JsonHandler([]byte(json), yamlHandler)
+	if err != nil {
+		panic(err)
+	}
+
+	store := urlstore.NewUrlStore()
+	dbErr := store.Put(&urlstore.Redirect{
+		Path: "/weather",
+		Url:  "https://www.metoffice.gov.uk/",
+	})
+
+	if dbErr != nil {
+		fmt.Printf("There was an error setting up the database %s\n", dbErr)
+		os.Exit(1)
+	}
+
+	dbHandler, err := urlshort.DbHandler(store, jsonHandler)
+	if err != nil {
+		panic(err)
+	}
 
 	fmt.Println("Starting the server on :8080")
-	http.ListenAndServe(":8080", jsonHandler)
+	http.ListenAndServe(":8080", dbHandler)
 }
 
 func defaultMux() *http.ServeMux {
