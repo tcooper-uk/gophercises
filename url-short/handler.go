@@ -54,10 +54,8 @@ func YAMLHandler(yml []byte, fallback http.Handler) (http.HandlerFunc, error) {
 		return nil, err
 	}
 
-	return func(writer http.ResponseWriter, request *http.Request) {
-		path := normalisePath(request.URL.Path)
-		doRedirectOrFallback(path, links, writer, request, fallback)
-	}, nil
+	linkMap := createLinkMap(links)
+	return MapHandler(linkMap, fallback), nil
 }
 
 // JsonHandler will parse the provided JSON and then return
@@ -86,16 +84,13 @@ func YAMLHandler(yml []byte, fallback http.Handler) (http.HandlerFunc, error) {
 // a mapping of paths to urls.
 func JsonHandler(rawJson []byte, fallback http.Handler) (http.HandlerFunc, error) {
 	links := make([]urlstore.Redirect, 0)
-
 	err := json.Unmarshal(rawJson, &links)
 	if err != nil {
 		return nil, err
 	}
 
-	return func(writer http.ResponseWriter, request *http.Request) {
-		path := normalisePath(request.URL.Path)
-		doRedirectOrFallback(path, links, writer, request, fallback)
-	}, nil
+	linkMap := createLinkMap(links)
+	return MapHandler(linkMap, fallback), nil
 }
 
 func DbHandler(store urlstore.Store, fallback http.Handler) (http.HandlerFunc, error) {
@@ -114,25 +109,13 @@ func DbHandler(store urlstore.Store, fallback http.Handler) (http.HandlerFunc, e
 	}, nil
 }
 
-func doRedirectOrFallback(path string, links []urlstore.Redirect, w http.ResponseWriter, r *http.Request, fallback http.Handler) {
-
-	link := findRedirect(links, path)
-
-	if link != nil {
-		http.RedirectHandler(link.Url, http.StatusPermanentRedirect).ServeHTTP(w, r)
-		return
+func createLinkMap(redirects []urlstore.Redirect) map[string]string {
+	response := make(map[string]string)
+	for _, redirect := range redirects {
+		response[redirect.Path] = redirect.Url
 	}
 
-	fallback.ServeHTTP(w, r)
-}
-
-func findRedirect(links []urlstore.Redirect, path string) *urlstore.Redirect {
-	for _, link := range links {
-		if link.Path == path {
-			return &link
-		}
-	}
-	return nil
+	return response
 }
 
 func normalisePath(path string) string {
