@@ -1,14 +1,13 @@
-package template
+package story
 
 import (
-	"adventure/internal/story"
 	"fmt"
 	"html/template"
 	"io"
 	"strings"
 )
 
-func ServeStoryTemplate(writer io.Writer, story *story.Story, layout string) error {
+func serveStoryTemplate(writer io.Writer, story *Story, layout string) error {
 
 	if !strings.HasSuffix(layout, ".html") {
 		layout = fmt.Sprintf("%s.html", layout)

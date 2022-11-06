@@ -3,6 +3,8 @@ package story
 import (
 	"encoding/json"
 	"errors"
+	"io/ioutil"
+	"os"
 )
 
 type Rels struct {
@@ -18,6 +20,17 @@ type Story struct {
 
 type Repo struct {
 	arcs map[string]Story
+}
+
+func LoadAllStoriesFromJson(f *os.File) (map[string]Story, error) {
+	json, err := ioutil.ReadAll(f)
+	stories, err := unmarshal(json)
+
+	if err != nil {
+		return stories, err
+	}
+
+	return stories, nil
 }
 
 func NewStoryRepo(data map[string]Story) *Repo {
@@ -37,7 +50,7 @@ func (repo *Repo) GetStory(arc string) (*Story, error) {
 	return &s, nil
 }
 
-func Unmarshal(data []byte) (map[string]Story, error) {
+func unmarshal(data []byte) (map[string]Story, error) {
 	var stories map[string]Story
 	err := json.Unmarshal(data, &stories)
 
